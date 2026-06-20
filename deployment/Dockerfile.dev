@@ -1,0 +1,28 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build && npm prune --omit=dev
+
+FROM node:20-alpine
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
+
+RUN addgroup -S nodejs && adduser -S order -G nodejs
+
+COPY --from=builder --chown=order:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=order:nodejs /app/dist ./dist
+COPY --from=builder --chown=order:nodejs /app/package*.json ./
+
+USER order
+
+EXPOSE 3001
+
+CMD ["node", "dist/main.js"]
